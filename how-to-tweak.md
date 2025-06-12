@@ -27,7 +27,7 @@ This is the most simple, open, and direct way to mod in Beyond All Reason. If yo
   }
   ```
 
-  To make multiple changes, you need to add commas to separate each assigned value. It is generally good practice to add trailing commas after every table, no matter what:
+  To make multiple changes, you need to add commas to separate each assigned value. It is good practice to add trailing commas after every table and key-value pair inside the main, outer table, like so:
 
   ```lua
   {
