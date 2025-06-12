@@ -55,7 +55,7 @@ $content = $content.TrimEnd('=') -replace '\+', '-' -replace '/', '_'
 
 $min_code_content = $content
 if ($null -eq $min_code_content -or $min_code_content.Length -eq 0) {
-    echo 'encoding failure'
+    Write-Output 'encoding failure'
 }
 else {
     Set-Content -Path $base_dir\$min_code -Value $min_code_content -Force -EA 0
@@ -64,24 +64,22 @@ else {
 # The gist contains portions of all the previous in a markdown document.
 $markdown = Get-Content -Path $base_dir\$git_gist -Raw | Out-String
 
-$heading = $headings.minified
 $code = $minified_readable
 
 $markdown = [regex]::Replace(
     $markdown,
-    ('(?sm)(#### $heading(?:\r?\n)+```lua).*?(```)' -replace '\$heading', $heading),
+    ('(?sm)(#### $heading(?:\r?\n)+```lua).*?(```)' -replace '\$heading', $headings.minified),
     {
         param($m)
         "$($m.Groups[1].Value)`n$code`n$($m.Groups[2].Value)" 
     }
 )
 
-$heading = $headings.encoding
 $code = $min_code_content
 
 $markdown = [regex]::Replace(
     $markdown,
-    ('(?sm)(#### $heading(?:\r?\n)+>).*?(\z)' -replace '\$heading', $heading),
+    ('(?sm)(#### $heading(?:\r?\n)+>).*?(\z)' -replace '\$heading', $headings.encoding),
     {
         param($m)
         "$($m.Groups[1].Value)`n$code`n$($m.Groups[2].Value)" 
