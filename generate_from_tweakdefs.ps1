@@ -5,13 +5,13 @@
 
 $base_dir = 'D:\vscode\proj\beyond-all-reason\small_teams'
 
-$tweakdef = '.\tweakdefs.lua'
-$encoding = '.\tweakdefs_encoding.txt'
-$minified = '.\tweakdefs_minified.lua'
-$min_code = '.\tweakdefs_minified_encoding.txt'
-$git_gist = '.\gist.md'
+$tweakdef = 'tweakdefs.lua'
+$encoding = 'tweakdefs_encoding.txt'
+$minified = 'tweakdefs_minified.lua'
+$min_code = 'tweakdefs_minified_encoding.txt'
+$template = 'template.md'
+$git_gist = 'gist.md'
 
-# frankly inadviseable regexery:
 $substitutions = @{
     '(?sm)\A--[\s\S]+?(?=^local)'                                          = "---small_teams_tweak`n"
     'local units = \{\}\r?\n'                                              = ''
@@ -20,9 +20,10 @@ $substitutions = @{
     '(?sm)[- \r\n]+Convert to tweakunits.+\r?\n\z'                         = ''
 }
 
-$headings = @{
-    minified = 'Tweakdefs'
-    encoding = 'Tweakdefs base64'
+$inserts = @{
+    tweakdefs  = '<!-- tweakdefs_readable -->'
+    tweakunits = '<!-- tweakunits_readable -->'
+    encoding   = '<!-- tweakdefs_encoding -->'
 }
 
 #-- Code -----------------------------------------------------------------------
@@ -59,28 +60,9 @@ $min_code_content = $tweakdef_content
 Set-Content -Path $base_dir\$min_code -Value $min_code_content -NoNewline -Force -EA 0
 
 # The gist contains portions of all the previous in a markdown document.
-$markdown = Get-Content -Path $base_dir\$git_gist -Raw | Out-String
+$markdown = Get-Content -Path $base_dir\$template -Raw | Out-String
 
-$code = $friendly_content
+$markdown = [regex]::Replace($markdown, $inserts.tweakdefs, ('```lua', $friendly_content, '```' -join "`n"))
+$markdown = [regex]::Replace($markdown, $inserts.encoding, ('>', $min_code_content -join ' '))
 
-$markdown = [regex]::Replace(
-    $markdown,
-    ('(?sm)(#### $heading(?:\r?\n)+```lua).*?(```)' -replace '\$heading', $headings.minified),
-    {
-        param($m)
-        "$($m.Groups[1].Value)`n$code`n$($m.Groups[2].Value)" 
-    }
-)
-
-$code = $min_code_content
-
-$markdown = [regex]::Replace(
-    $markdown,
-    ('(?sm)(#### $heading(?:\r?\n)+>).*?(\z)' -replace '\$heading', $headings.encoding),
-    {
-        param($m)
-        "$($m.Groups[1].Value)`n$code`n$($m.Groups[2].Value)" 
-    }
-)
-
-Set-Content -Path $base_dir\$git_gist -Value $markdown -Force -EA 0
+Set-Content -Path $base_dir\$git_gist -Value $markdown -NoNewline -Force -EA 0
