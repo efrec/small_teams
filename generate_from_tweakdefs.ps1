@@ -6,7 +6,7 @@
 $base_dir = 'D:\vscode\proj\beyond-all-reason\small_teams'
 
 $tweakdef = '.\tweakdefs.lua'
-$encoding = '.\tweakdefs_encoding.lua'
+$encoding = '.\tweakdefs_encoding.txt'
 $minified = '.\tweakdefs_minified.lua'
 $min_code = '.\tweakdefs_minified_encoding.txt'
 $git_gist = '.\gist.md'
@@ -27,44 +27,41 @@ $headings = @{
 
 #-- Code -----------------------------------------------------------------------
 
-$content = Get-Content -Path $base_dir\$tweakdef -Raw | Out-String
+$tweakdef_content = Get-Content -Path $base_dir\$tweakdef -Raw | Out-String
 
 # Run in BAR to get tweakunits from infolog (todo: write it to file directly).
-$encoding_content = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([string] $content))
+$encoding_content = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([string] $tweakdef_content))
 $encoding_content = $encoding_content.TrimEnd('=') -replace '\+', '-' -replace '/', '_'
-Set-Content -Path $base_dir\$encoding -Value $encoding_content -Force -EA 0
 
+Set-Content -Path $base_dir\$encoding -Value $encoding_content -NoNewline -Force -EA 0
+
+# User-facing tweakdefs have unnecessary utility code removed.
 $substitutions.GetEnumerator() | ForEach-Object {
-    $content = $content -replace $_.Key, $_.Value
+    $tweakdef_content = $tweakdef_content -replace $_.Key, $_.Value
 }
 
-# User-facing tweakdefs have some utils removed first.
-$minified_readable = $content
+$friendly_content = $tweakdef_content
 
+# The tweakdefs code is minified before encoding to be as small as possible.
 if (-not (Get-Command luamin -EA 0)) {
     npm install -g luamin
 }
-$content = luamin -c $content
+$tweakdef_content = luamin -c $tweakdef_content
 
-$minified_content = $content
-Set-Content -Path $base_dir\$minified -Value $minified_content -Force -EA 0
+$minified_content = $tweakdef_content
+Set-Content -Path $base_dir\$minified -Value $minified_content -NoNewline -Force -EA 0
 
-# The final encoding is further reduced and minified to be as small as possible.
-$content = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([string] $content))
-$content = $content.TrimEnd('=') -replace '\+', '-' -replace '/', '_'
+$tweakdef_content = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([string] $tweakdef_content))
+$tweakdef_content = $tweakdef_content.TrimEnd('=') -replace '\+', '-' -replace '/', '_'
 
-$min_code_content = $content
-if ($null -eq $min_code_content -or $min_code_content.Length -eq 0) {
-    Write-Output 'encoding failure'
-}
-else {
-    Set-Content -Path $base_dir\$min_code -Value $min_code_content -Force -EA 0
-}
+$min_code_content = $tweakdef_content
+
+Set-Content -Path $base_dir\$min_code -Value $min_code_content -NoNewline -Force -EA 0
 
 # The gist contains portions of all the previous in a markdown document.
 $markdown = Get-Content -Path $base_dir\$git_gist -Raw | Out-String
 
-$code = $minified_readable
+$code = $friendly_content
 
 $markdown = [regex]::Replace(
     $markdown,
