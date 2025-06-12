@@ -6,8 +6,9 @@
 $base_dir = 'D:\vscode\proj\beyond-all-reason\small_teams'
 
 $tweakdef = '.\tweakdefs.lua'
+$encoding = '.\tweakdefs_encoding.lua'
 $minified = '.\tweakdefs_minified.lua'
-$encoding = '.\tweakdefs_minified_encoding.txt'
+$min_code = '.\tweakdefs_minified_encoding.txt'
 $git_gist = '.\gist.md'
 
 # frankly inadviseable regexery:
@@ -28,10 +29,16 @@ $headings = @{
 
 $content = Get-Content -Path $base_dir\$tweakdef -Raw | Out-String
 
+# Run in BAR to get tweakunits from infolog (todo: write it to file directly).
+$encoding_content = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([string] $content))
+$encoding_content = $encoding_content.TrimEnd('=') -replace '\+', '-' -replace '/', '_'
+Set-Content -Path $base_dir\$encoding -Value $encoding_content -Force -EA 0
+
 $substitutions.GetEnumerator() | ForEach-Object {
     $content = $content -replace $_.Key, $_.Value
 }
 
+# User-facing tweakdefs have some utils removed first.
 $minified_readable = $content
 
 if (-not (Get-Command luamin -EA 0)) {
@@ -42,17 +49,19 @@ $content = luamin -c $content
 $minified_content = $content
 Set-Content -Path $base_dir\$minified -Value $minified_content -Force -EA 0
 
+# The final encoding is further reduced and minified to be as small as possible.
 $content = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([string] $content))
 $content = $content.TrimEnd('=') -replace '\+', '-' -replace '/', '_'
 
-$encoding_content = $content
-if ($null -eq $encoding_content -or $encoding_content.Length -eq 0) {
+$min_code_content = $content
+if ($null -eq $min_code_content -or $min_code_content.Length -eq 0) {
     echo 'encoding failure'
 }
 else {
-    Set-Content -Path $base_dir\$encoding -Value $encoding_content -Force -EA 0
+    Set-Content -Path $base_dir\$min_code -Value $min_code_content -Force -EA 0
 }
 
+# The gist contains portions of all the previous in a markdown document.
 $markdown = Get-Content -Path $base_dir\$git_gist -Raw | Out-String
 
 $heading = $headings.minified
@@ -68,7 +77,7 @@ $markdown = [regex]::Replace(
 )
 
 $heading = $headings.encoding
-$code = $encoding_content
+$code = $min_code_content
 
 $markdown = [regex]::Replace(
     $markdown,
