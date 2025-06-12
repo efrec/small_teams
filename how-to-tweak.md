@@ -31,8 +31,8 @@ This is the most simple, open, and direct way to mod in Beyond All Reason. If yo
 
   ```lua
   {
-    armpw = { metalcost = 10, energycost = 10 },
-    corak = { metalcost = 10, energycost = 10 },
+    armpw = { metalcost = 10, energycost = 10, },
+    corak = { metalcost = 10, energycost = 10, },
   }
   ```
 
