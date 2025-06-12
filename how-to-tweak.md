@@ -2,7 +2,9 @@
 
 > **Important**
 > 
-> When playing in a public lobby, make sure the players actually want to play with mods. Not everyone does, and not everyone can be convinced. In addition, you will need to be the lobby boss to be able to set modoptions and/or apply tweaks.
+> When playing in a public lobby, make sure the players actually want to play with mods. Not everyone does, and not everyone can be convinced.
+> 
+> Also, you will need to be the lobby boss to set modoptions and/or apply tweaks in multiplayer.
 
 ## Tweakunits: Make specific changes to specific units
 

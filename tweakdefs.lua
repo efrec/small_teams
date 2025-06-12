@@ -3,6 +3,10 @@
 -- This version is hard for non-coders to read but offers some other advantages.
 --------------------------------------------------------------------------------
 
+if not UnitDefs.legcom then
+	Spring.Echo('Error in small teams tweadefs: Legion not enabled.')
+end
+
 --------------------------------------------------------------------------------
 -- Initialize ------------------------------------------------------------------
 
