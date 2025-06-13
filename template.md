@@ -1,4 +1,4 @@
-# DUST-UP T1
+# DUSTUP T1
 
 **A Duels and Small Teams Unit Patch for T1**
 
