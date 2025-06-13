@@ -114,14 +114,20 @@ end
 
 local function diff(old, new)
 	local d = {}
+	for i, v_o in ipairs(old) do
+		-- todo: need to detect shifts/deletes in sequences
+		-- todo: and also probably make BAR's tableMerge for tweaks do nice, neat shift-delete with = "nil"
+	end
 	for k, v_o in pairs(old) do
-		local v_n = new[k]
-		if v_n == nil then
-			d[k] = "nil"
-		elseif type(v_o) == "table" and type(v_n) == "table" then
-			d[k] = diff(v_o, v_n)
-		elseif v_o ~= v_n and (type(v_o) == type(v_n) or dumb_equal(v_o, v_n)) then
-			d[k] = v_n
+		if type(k) ~= "number" then
+			local v_n = new[k]
+			if v_n == nil then
+				d[k] = "nil"
+			elseif type(v_o) == "table" and type(v_n) == "table" then
+				d[k] = diff(v_o, v_n)
+			elseif v_o ~= v_n and (type(v_o) == type(v_n) or dumb_equal(v_o, v_n)) then
+				d[k] = v_n
+			end
 		end
 	end
 	for k, v_n in pairs(new) do
@@ -255,7 +261,7 @@ end
 for _, faction in ipairs { "arm", "cor", "leg" } do
 	for _, factory in ipairs { "lab", "vp", "ap", "sy" } do
 		if unit(faction .. factory) then
-			costs(0.5, 300, 900, 4000)
+			costs(0.5, 300, 900, 1000)
 			unitDef.workertime = neat(unitDef.workertime * 2.5, 50)
 		end
 	end
@@ -266,13 +272,13 @@ for _, faction in ipairs { "arm", "cor", "leg" } do
 	end
 	for _, factory in ipairs { "alab", "avp", "aap", "asy" } do
 		if unit(faction .. factory) then
-			costs(1, -500, 2000, 5000)
+			costs(1, -500, 2000, 2500)
 			unitDef.workertime = neat(unitDef.workertime * 5)
 		end
 	end
 	for _, factory in ipairs { "gant", "gantuw", "shltx", "shltxuw" } do
 		if unit(faction .. factory) then
-			costs(1.5, 1000, 10000, 2000)
+			costs(1.25)
 			unitDef.workertime = neat(unitDef.workertime * 7.5, 500)
 		end
 	end
@@ -282,7 +288,7 @@ for _, faction in ipairs { "arm", "cor", "leg" } do
 		if unit(faction .. turret) then
 			costs(1, 50, 500, 1000)
 			-- We need ways to justify the expense, then:
-			unitDef.metalstorage = 50
+			unitDef.metalstorage = 25
 			unitDef.energystorage = 50
 			if faction == "cor" then
 				unitDef.health = neat(unitDef.health * 1.125, 25)
@@ -373,7 +379,7 @@ unitDef.explodeas = "mediumExplosionGenericSelfd"
 unitDef.selfdestructas = "fb_blastsml"
 unitDef.customparams.techlevel = nil
 for name, def in ipairs(UnitDefs) do
-	if def.builder and type(def.buildoptions) == "table" then
+	if type(def.buildoptions) == "table" then
 		for i, bo in pairs(def.buildoptions) do
 			if bo == "corroach" then
 				unit(name)
