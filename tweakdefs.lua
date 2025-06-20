@@ -182,7 +182,7 @@ custom(unit("corroach")).techlevel = 1
 -- Scout leaks are not high-APM gameplay but high-attention gameplay.
 -- We want you to act strategically early on until you are warmed up.
 
-for name, def in ipairs(UnitDefs) do
+for name, def in pairs(UnitDefs) do
 	if (custom(def).techlevel or 1) < 1.5 then
 		if def.extractsmetal and def.extractsmetal > 0 then
 			def.health = neat(unit(name).health * 2, 25)
