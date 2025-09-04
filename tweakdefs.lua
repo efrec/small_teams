@@ -10,6 +10,22 @@ end
 --------------------------------------------------------------------------------
 -- Initialize ------------------------------------------------------------------
 
+-- This sets up a small designer language for making tweaks, which might not be
+-- your cup of tea, exactly. For that, I keep a list of common variables to set
+-- the active def being edited and to copy properties from other, related defs.
+--
+-- > unit("armpw")     -- This gets the Pawn def (iff exists) and puts it in `unitDef`.
+-- > weapon("emg")     -- This gets the unitDef's emg def and stores it in `weaponDef`.
+-- > custom(unitDef)   -- This gets the Pawn's customParams and stores it in `cparams`.
+-- > custom(weaponDef) -- This gets the Pawn's EMG weapon customParams, etc., as above.
+--
+-- Then there are a few basic utilities for modifying existing values:
+-- > costs(1.2, 0, 0, 500) -- Modify unitDef costs (all x1.2, then +500 BP).
+-- > damages(2, 10)        -- Modify weaponDef damages (all x2, then +10).
+--
+-- And at an even more basic level:
+-- > unitDef.health = neat(unitDef.health, 50) -- Give things "nice, neat" values.
+
 local unitDef, weaponDef, cparams, ref
 local units = {}
 local divisors = { 2, 4, 5, 8, 12, 20, 50, 125, 250 }
@@ -210,15 +226,13 @@ unitDef.speed = neat(unitDef.speed * 1.08)
 unit("armflash")
 unitDef.speed = neat(unitDef.speed * 1.08)
 
-unit("armkam")
-weapon("emg")
+unit("armkam"); weapon("emg");
 weaponDef.sprayangle = neat(weaponDef.sprayangle * 0.6)
 weaponDef.weaponvelocity = neat(weaponDef.weaponvelocity * 1.1)
 weaponDef.firetolerance = 3600
 
-unit("corlevlr")
+unit("corlevlr"); weapon("corlevlr_weapon");
 unitDef.speed = neat(unitDef.speed * 1.1)
-weapon("corlevlr_weapon")
 weaponDef.range = neat(weaponDef.range * 0.92)
 
 -- This gives ground-to-ground capabilities to AA weapons (though pitifully weak).
@@ -228,10 +242,9 @@ weaponDef.range = neat(weaponDef.range * 0.92)
 -- With more ground AA, air, especially air scouts, can be balanced for survival.
 
 for name, wname in pairs { armrl = "armrl_missile", armcir = "arm_cir", corrl = "corrl_missile", corerad = "cor_erad", legrl = "legrl_missile", legrhapsis = "burst_aa_missile" } do
-	unit(name)
+	unit(name); weapon(wname);
 	unitDef.weapons[1].fastautoretargeting = true
 	unitDef.weapons[1].onlytargetcategory = "NOTSUB"
-	weapon(wname)
 	local salvo = (weaponDef.burst or 1) * (weaponDef.projectiles or 1)
 	weaponDef.damage.default = neat((20 + 0.2 * weaponDef.damage.vtol * salvo) / salvo)
 end
@@ -303,20 +316,18 @@ end
 -- T1.5 is not a reified game mechanic but a classification schema for units.
 -- They are more expensive, more powerful, and have better resistance to EMP.
 
-unit("armwar")
+unit("armwar"); weapon("armwar_laser");
 costs(1.2, 0, 0, 300)
 unitDef.health = neat(unitDef.health * 1.25, 25)
 unitDef.idleautoheal = 10
 unitDef.speed = neat(unitDef.speed * 1.3333)
-weapon("armwar_laser")
 weaponDef.range = neat(weaponDef.range - 30)
 damages(1.25)
 
-unit("armjanus")
+unit("armjanus"); weapon("janus_rocket");
 costs(1.3333)
 unitDef.health = neat(unitDef.health * 1.1667, 25)
 unitDef.speed = neat(unitDef.speed * 1.125)
-weapon("janus_rocket")
 weaponDef.reloadtime = weaponDef.reloadtime * 0.925
 
 unit("armamex")
@@ -328,12 +339,11 @@ unitDef.radardistance = 1000
 unitDef.radaremitheight = 24
 unitDef.sightdistance = 200
 
-unit("corthud")
+unit("corthud"); weapon("arm_ham");
 costs(2)
 unitDef.health = neat(unitDef.health * 2, 25)
 unitDef.speed = neat(unitDef.speed * 1.1667)
 unitDef.turnrate = unitDef.turnrate * 1.05
-weapon("arm_ham")
 weaponDef.areaofeffect = neat(weaponDef.areaofeffect * 1.1667)
 weaponDef.burst = 2
 weaponDef.burstrate = 0.25
@@ -400,8 +410,8 @@ unitDef.buildoptions[#unitDef.buildoptions + 1] = "corroach"
 -- HEMG
 ref = UnitDefs.armkam.weapondefs.emg
 for name, wname in pairs { armwar = "armwar_laser", armhlt = "arm_laserh1" } do
-	unit(name)
-	weapon(wname).name = "Heavy EMG"
+	unit(name); weapon(wname);
+	weaponDef.name = "Heavy EMG"
 	copy(weaponDef,
 		"weapontype",
 		"corethickness", "explosiongenerator", "intensity", "laserflaresize", "rgbcolor", "thickness", "size",
@@ -419,9 +429,9 @@ end
 -- Gauss
 ref = UnitDefs.armmav.weapondefs.armmav_weapon
 for name, wname in pairs { armham = "arm_ham" } do
-	unit(name)
+	unit(name); weapon(wname);
 	costs(1.1) -- Not a neutral conversion.
-	weapon(wname).name = "Gauss Plasma Cannon"
+	weaponDef.name = "Gauss Plasma Cannon"
 	copy(weaponDef, 'impulsefactor', 'weaponvelocity')
 	weaponDef.reloadtime = neat(weaponDef.reloadtime * 1.75, 0.01)
 	damages(1.75)
@@ -429,8 +439,8 @@ end
 
 -- LSFR
 for name, wname in pairs { cormist = "cortruck_missile", corstorm = "cor_bot_rocket" } do
-	unit(name)
-	weapon(wname).name = "Light Solid-Fuel Rocket"
+	unit(name); weapon(wname);
+	weaponDef.name = "Light Solid-Fuel Rocket"
 	weaponDef.model = "legsmallrocket.s3o"
 	weaponDef.burnblow = false
 	weaponDef.mygravity = 0
@@ -459,3 +469,4 @@ for name, old in pairs(units) do
 	tweaks[name] = diff(old, UnitDefs[name])
 end
 Spring.Echo(tweaks)
+
