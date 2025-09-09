@@ -1,9 +1,12 @@
 --------------------------------------------- [ small_teams_tweakdefs.lua ] ----
--- Adapted from and in relation to the Unofficial Tech Overhaul, by neb & encyc.
--- This version is hard for non-coders to read but offers some other advantages.
+-- Experimenting with the tweakdefs format, especially the need to conserve char
+-- count for very-very-large tweaks. This was originally around 24000 characters
+-- before changes; this file is 15.7k; and the minified tweakdef is ~7300 chars.
 --------------------------------------------------------------------------------
 
-if not UnitDefs.legcom then
+local UD = UnitDefs
+
+if not UD.legcom then
 	Spring.Echo('Error in small teams tweadefs: Legion not enabled.')
 end
 
@@ -29,7 +32,7 @@ local function equal(old, new)
 		((old == 1 or old == "true") and new ~= true)
 end
 
-local function diff(old, new)
+local function tweak(old, new)
 	local d = {}
 	for k, v_o in pairs(old) do
 		if type(k) ~= "number" then
@@ -37,7 +40,7 @@ local function diff(old, new)
 			if v_n == nil then
 				d[k] = "nil"
 			elseif type(v_o) == "table" and type(v_n) == "table" then
-				d[k] = diff(v_o, v_n)
+				d[k] = tweak(v_o, v_n)
 			elseif v_o ~= v_n and (type(v_o) == type(v_n) or equal(v_o, v_n)) then
 				d[k] = v_n
 			end
@@ -62,11 +65,15 @@ end
 -- > custom(unitDef)   -- This gets the Pawn's customParams and stores it in `cparams`.
 -- > custom(weaponDef) -- This gets the Pawn's EMG weapon customParams, etc., as above.
 --
--- Then there are a few basic utilities for modifying existing values:
--- > costs(1.2, 0, 0, 500) -- Modify unitDef costs (all x1.2, then +500 BP).
--- > damages(2, 10)        -- Modify weaponDef damages (all x2, then +10).
+-- Then, you can modify the properties of a common variable, like so:
+-- > unitDef.health = neat(unitDef.health * 2, 25) -- Give a clean number (round to 25).
+-- > set(unitDef, "health", 2, 0, 25)              -- Same as above, but in fewer chars.
 --
--- And at an even more basic level:
+-- There are two helpers for common modifications:
+-- > costs(1.2, 0, 0, 500) -- Modify unitDef costs (all x1.2, then +500 BP).
+-- > damages(2, 10)        -- Modify weaponDef damages (all x2, then all +10).
+--
+-- And at a more basic level:
 -- > unitDef.health = neat(unitDef.health, 50) -- Give things "nice, neat" values.
 
 local unitDef, weaponDef, cparams, ref
@@ -75,7 +82,7 @@ local divisors = { 2, 4, 5, 8, 12, 20, 50, 125, 250 }
 local m2e, m2b = 20, 30
 
 local function unit(name)
-	unitDef = UnitDefs[name]
+	unitDef = UD[name]
 	if unitDef and not units[name] then
 		units[name] = deep(unitDef)
 	end
@@ -134,20 +141,21 @@ local function set(tbl, key, mult, add, precision)
 	end
 end
 
-local function costs(mult, base_m, base_e, base_b)
-	if not base_m then base_m = 0 end
-	if not base_e then
-		base_e = base_m * (unitDef.metalcost and unitDef.metalcost > 0 and unitDef.energycost / unitDef.metalcost or m2e)
+local function costs(mult, add_m, add_e, add_bp)
+	local u = unitDef
+	if not add_m then add_m = 0 end
+	if not add_e then
+		add_e = add_m * (u.metalcost and u.metalcost > 0 and u.energycost / u.metalcost or m2e)
 	end
-	if not base_b then
-		base_b = base_m * (unitDef.metalcost and unitDef.metalcost > 0 and unitDef.buildtime / unitDef.metalcost or m2b)
+	if not add_bp then
+		add_bp = add_m * (u.metalcost and u.metalcost > 0 and u.buildtime / u.metalcost or m2b)
 	end
-	local metal = neat(unitDef.metalcost * mult + base_m, 10)
-	local ratio = metal / unitDef.metalcost
-	unitDef.metalcost = metal
-	set(unitDef, "energycost", mult, base_e, 10)
-	set(unitDef, "buildtime", mult, base_b, 10)
-	for _, fd in pairs(unitDef.featuredefs or {}) do
+	local metal = neat(u.metalcost * mult + add_m, 10)
+	local ratio = metal / u.metalcost
+	u.metalcost = metal
+	set(u, "energycost", mult, add_e, 10)
+	set(u, "buildtime", mult, add_bp, 10)
+	for _, fd in pairs(u.featuredefs or {}) do
 		fd.metal = math.floor(ratio * fd.metal + 0.5)
 	end
 end
@@ -182,7 +190,7 @@ local techUp = {
 	"corthud", "cormist", "corroy", "corerad", "corexp",
 }
 
-for name, def in pairs(UnitDefs) do
+for name, def in pairs(UD) do
 	if custom(def).techlevel == 1.5 then
 		techUp[#techUp + 1] = name
 	end
@@ -201,7 +209,7 @@ custom(unit("corroach")).techlevel = 1
 -- Scout leaks are not high-APM gameplay but high-attention gameplay.
 -- We want you to act strategically early on until you are warmed up.
 
-for name, def in pairs(UnitDefs) do
+for name, def in pairs(UD) do
 	if (custom(def).techlevel or 1) < 1.5 then
 		if def.extractsmetal and def.extractsmetal > 0 then
 			set(unit(name), "health", 2, 0, 25)
@@ -229,12 +237,12 @@ set(unitDef, "speed", 1.08)
 unit("armflash")
 set(unitDef, "speed", 1.08)
 
-unit("armkam"); weapon("emg");
+unit("armkam") weapon("emg")
 set(weaponDef, "sprayangle", 0.6)
 set(weaponDef, "weaponvelocity", 1.1)
 weaponDef.firetolerance = 3600
 
-unit("corlevlr"); weapon("corlevlr_weapon");
+unit("corlevlr") weapon("corlevlr_weapon")
 set(unitDef, "health", 1.1)
 set(unitDef, "speed", 1.1)
 set(weaponDef, "range", 0.92)
@@ -246,7 +254,7 @@ set(weaponDef, "range", 0.92)
 -- With more ground AA, air, especially air scouts, can be balanced for survival.
 
 for name, wname in pairs { armrl = "armrl_missile", armcir = "arm_cir", corrl = "corrl_missile", corerad = "cor_erad", legrl = "legrl_missile", legrhapsis = "burst_aa_missile" } do
-	unit(name); weapon(wname);
+	unit(name) weapon(wname)
 	unitDef.weapons[1].fastautoretargeting = true
 	unitDef.weapons[1].onlytargetcategory = "NOTSUB"
 	local salvo = (weaponDef.burst or 1) * (weaponDef.projectiles or 1)
@@ -263,7 +271,7 @@ for _, name in ipairs { "armmoho", "cormoho", "cormexp", "legmoho", "legmoho", "
 	unit(name)
 	costs(1, 100, 2000, 900)
 end
-for name, def in pairs(UnitDefs) do
+for name, def in pairs(UD) do
 	if custom(def).techlevel == 2 then
 		set(unit(name), "buildtime", 1.5)
 	elseif cparams.techlevel == 3 then
@@ -318,7 +326,7 @@ end
 -- T1.5 is not a reified game mechanic but a classification schema for units.
 -- They are more expensive, more powerful, and have better resistance to EMP.
 
-unit("armwar"); weapon("armwar_laser");
+unit("armwar") weapon("armwar_laser")
 costs(1.2, 0, 0, 300)
 set(unitDef, "health", 1.25, 0, 25)
 set(unitDef, "speed", 1.3333)
@@ -326,7 +334,7 @@ unitDef.idleautoheal = 10
 set(weaponDef, "range", 0, -30)
 damages(1.25)
 
-unit("armjanus"); weapon("janus_rocket");
+unit("armjanus") weapon("janus_rocket")
 costs(1.3333)
 set(unitDef, "health", 1.1667, 0, 25)
 set(unitDef, "speed", 1.125)
@@ -341,7 +349,7 @@ unitDef.radardistance = 1000
 unitDef.radaremitheight = 24
 unitDef.sightdistance = 200
 
-unit("corthud"); weapon("arm_ham");
+unit("corthud") weapon("arm_ham")
 costs(2)
 set(unitDef, "health", 2)
 set(unitDef, "speed", 1.1667)
@@ -357,12 +365,12 @@ set(unitDef, "health", 1.3333, 0, 25)
 for _, wname in ipairs { "cortruck_aa", "cortruck_missile" } do
 	weapon(wname)
 	set(weaponDef, "reloadtime", 2)
-	weaponDef.areaofeffect = UnitDefs.corstorm.weapondefs.cor_bot_rocket.areaofeffect + 2
+	weaponDef.areaofeffect = UD.corstorm.weapondefs.cor_bot_rocket.areaofeffect + 2
 	weaponDef.burst = 3
 	weaponDef.burstrate = 0.375
 end
 
-unit("corexp"); weapon("hllt_bottom");
+unit("corexp") weapon("hllt_bottom")
 costs(1.5)
 set(unitDef, "health", 1.3333, 0, 25)
 unitDef.idleautoheal = 10
@@ -373,7 +381,7 @@ damages(1.125)
 --------------------------------------------------------------------------------
 -- Cortex bots -----------------------------------------------------------------
 
-unit("corak"); weapon("gator_laser");
+unit("corak") weapon("gator_laser")
 costs(0.8888)
 set(unitDef, "health", 0.8888, 0, 25)
 set(weaponDef, "range", 1.05)
@@ -383,12 +391,12 @@ costs(0.5, 0, -2000, -2000)
 set(unitDef, "speed", 1.3333)
 unitDef.maxwaterdepth = 16
 unitDef.movementclass = "BOT1"
-unitDef.radardistance = UnitDefs.armflea.sightdistance + 30
+unitDef.radardistance = UD.armflea.sightdistance + 30
 unitDef.radaremitheight = 18
 unitDef.explodeas = "mediumExplosionGenericSelfd"
 unitDef.selfdestructas = "fb_blastsml"
 unitDef.customparams.techlevel = nil
-for name, def in pairs(UnitDefs) do
+for name, def in pairs(UD) do
 	if type(def.buildoptions) == "table" then
 		for i, bo in pairs(def.buildoptions) do
 			if bo == "corroach" then
@@ -407,9 +415,9 @@ unitDef.buildoptions[#unitDef.buildoptions + 1] = "corroach"
 -- Overall stat changes (eg total burst size) should be done in other sections.
 
 -- HEMG
-ref = UnitDefs.armkam.weapondefs.emg
+ref = UD.armkam.weapondefs.emg
 for name, wname in pairs { armwar = "armwar_laser", armhlt = "arm_laserh1" } do
-	unit(name); weapon(wname);
+	unit(name) weapon(wname)
 	weaponDef.name = "Heavy EMG"
 	copy(weaponDef,
 		"weapontype",
@@ -426,9 +434,9 @@ for name, wname in pairs { armwar = "armwar_laser", armhlt = "arm_laserh1" } do
 end
 
 -- Gauss
-ref = UnitDefs.armmav.weapondefs.armmav_weapon
+ref = UD.armmav.weapondefs.armmav_weapon
 for name, wname in pairs { armham = "arm_ham" } do
-	unit(name); weapon(wname);
+	unit(name) weapon(wname)
 	costs(1.1) -- Not a neutral conversion.
 	weaponDef.name = "Gauss Plasma Cannon"
 	copy(weaponDef, 'impulsefactor', 'weaponvelocity')
@@ -438,7 +446,7 @@ end
 
 -- LSFR
 for name, wname in pairs { cormist = "cortruck_missile", corstorm = "cor_bot_rocket" } do
-	unit(name); weapon(wname);
+	unit(name) weapon(wname)
 	weaponDef.name = "Light Solid-Fuel Rocket"
 	weaponDef.model = "legsmallrocket.s3o"
 	weaponDef.burnblow = false
@@ -465,6 +473,6 @@ end
 
 local tweaks = {}
 for name, old in pairs(units) do
-	tweaks[name] = diff(old, UnitDefs[name])
+	tweaks[name] = tweak(old, UD[name])
 end
 Spring.Echo(tweaks)
