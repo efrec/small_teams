@@ -10,11 +10,6 @@ end
 --------------------------------------------------------------------------------
 -- Initialize ------------------------------------------------------------------
 
-local unitDef, weaponDef, cparams, ref
-local units = {}
-local divisors = { 2, 4, 5, 8, 12, 20, 50, 125, 250 }
-local m2e, m2b = 20, 30
-
 local function deep(tbl)
 	local new = {}
 	for k, v in pairs(tbl) do
@@ -25,6 +20,77 @@ local function deep(tbl)
 		end
 	end
 	return new
+end
+
+local function equal(old, new)
+	return
+		(type(old) == "string" and tonumber(old) and tonumber(old) ~= new) or
+		((old == 0 or old == "false") and new ~= false) or
+		((old == 1 or old == "true") and new ~= true)
+end
+
+local function diff(old, new)
+	local d = {}
+	for k, v_o in pairs(old) do
+		if type(k) ~= "number" then
+			local v_n = new[k]
+			if v_n == nil then
+				d[k] = "nil"
+			elseif type(v_o) == "table" and type(v_n) == "table" then
+				d[k] = diff(v_o, v_n)
+			elseif v_o ~= v_n and (type(v_o) == type(v_n) or equal(v_o, v_n)) then
+				d[k] = v_n
+			end
+		end
+	end
+	for k, v_n in pairs(new) do
+		if old[k] == nil then
+			d[k] = v_n
+		end
+	end
+	if next(d) then
+		return d
+	end
+end
+
+-- This sets up a small designer language for making tweaks, which might not be
+-- your cup of tea, exactly. For that, I keep a list of common variables to set
+-- the active def being edited and to copy properties from other, related defs.
+--
+-- > unit("armpw")     -- This gets the Pawn def (iff exists) and puts it in `unitDef`.
+-- > weapon("emg")     -- This gets the unitDef's emg def and stores it in `weaponDef`.
+-- > custom(unitDef)   -- This gets the Pawn's customParams and stores it in `cparams`.
+-- > custom(weaponDef) -- This gets the Pawn's EMG weapon customParams, etc., as above.
+--
+-- Then there are a few basic utilities for modifying existing values:
+-- > costs(1.2, 0, 0, 500) -- Modify unitDef costs (all x1.2, then +500 BP).
+-- > damages(2, 10)        -- Modify weaponDef damages (all x2, then +10).
+--
+-- And at an even more basic level:
+-- > unitDef.health = neat(unitDef.health, 50) -- Give things "nice, neat" values.
+
+local unitDef, weaponDef, cparams, ref
+local units = {}
+local divisors = { 2, 4, 5, 8, 12, 20, 50, 125, 250 }
+local m2e, m2b = 20, 30
+
+local function unit(name)
+	unitDef = UnitDefs[name]
+	if unitDef and not units[name] then
+		units[name] = deep(unitDef)
+	end
+	return unitDef
+end
+
+local function weapon(name)
+	weaponDef = unitDef.weapondefs[name]
+	return weaponDef
+end
+
+local function custom(def)
+	cparams = def.customparams or {}
+	def.customparams = cparams
+	return cparams
 end
 
 local function copy(def, ...)
@@ -61,6 +127,13 @@ local function neat(value, precision)
 	return neatest * precision
 end
 
+local function set(tbl, key, mult, add, precision)
+	local value = tonumber(tbl[key])
+	if type(value) == "number" then
+		tbl[key] = neat(value * (mult or 1) + (add or 0), precision)
+	end
+end
+
 local function costs(mult, base_m, base_e, base_b)
 	if not base_m then base_m = 0 end
 	if not base_e then
@@ -72,71 +145,17 @@ local function costs(mult, base_m, base_e, base_b)
 	local metal = neat(unitDef.metalcost * mult + base_m, 10)
 	local ratio = metal / unitDef.metalcost
 	unitDef.metalcost = metal
-	unitDef.energycost = neat(unitDef.energycost * mult + base_e, 10)
-	unitDef.buildtime = neat(unitDef.buildtime * mult + base_b, 10)
-	for name, def in pairs(unitDef.featuredefs or {}) do
-		def.metal = math.floor(ratio * def.metal + 0.5)
+	set(unitDef, "energycost", mult, base_e, 10)
+	set(unitDef, "buildtime", mult, base_b, 10)
+	for _, fd in pairs(unitDef.featuredefs or {}) do
+		fd.metal = math.floor(ratio * fd.metal + 0.5)
 	end
 end
 
 local function damages(mult, base)
 	if not base then base = 0 end
-	for armor, value in pairs(weaponDef.damage) do
-		weaponDef.damage[armor] = neat(value * mult + base)
-	end
-end
-
-local function unit(name)
-	unitDef = UnitDefs[name]
-	if unitDef and not units[name] then
-		units[name] = deep(unitDef)
-	end
-	return unitDef
-end
-
-local function weapon(name)
-	weaponDef = unitDef.weapondefs[name]
-	return weaponDef
-end
-
-local function custom(def)
-	cparams = def.customparams or {}
-	def.customparams = cparams
-	return cparams
-end
-
-local function dumb_equal(old, new)
-	return
-		(type(old) == "string" and tonumber(old) and tonumber(old) ~= new) or
-		((old == 0 or old == "false") and new ~= false) or
-		((old == 1 or old == "true") and new ~= true)
-end
-
-local function diff(old, new)
-	local d = {}
-	for i, v_o in ipairs(old) do
-		-- todo: need to detect shifts/deletes in sequences
-		-- todo: and also probably make BAR's tableMerge for tweaks do nice, neat shift-delete with = "nil"
-	end
-	for k, v_o in pairs(old) do
-		if type(k) ~= "number" then
-			local v_n = new[k]
-			if v_n == nil then
-				d[k] = "nil"
-			elseif type(v_o) == "table" and type(v_n) == "table" then
-				d[k] = diff(v_o, v_n)
-			elseif v_o ~= v_n and (type(v_o) == type(v_n) or dumb_equal(v_o, v_n)) then
-				d[k] = v_n
-			end
-		end
-	end
-	for k, v_n in pairs(new) do
-		if old[k] == nil then
-			d[k] = v_n
-		end
-	end
-	if next(d) then
-		return d
+	for armor in pairs(weaponDef.damage) do
+		set(weaponDef.damage, armor, mult, base)
 	end
 end
 
@@ -148,9 +167,9 @@ end
 
 for _, name in ipairs { "armcom", "corcom", "legcom" } do
 	unit(name)
-	unitDef.airsightdistance = neat(unitDef.sightdistance * 1.5)
-	unitDef.cloakcost = neat(unitDef.cloakcost * 0.7)
-	unitDef.cloakcostmoving = neat(unitDef.cloakcostmoving * 0.7)
+	set(unitDef, "airsightdistance", 1.5)
+	set(unitDef, "cloakcost", 0.7)
+	set(unitDef, "cloakcostmoving", 0.7)
 end
 
 --------------------------------------------------------------------------------
@@ -171,7 +190,7 @@ end
 
 for _, name in ipairs(techUp) do
 	custom(unit(name)).techlevel = 1.5
-	cparams.paralyzemultiplier = 0.7
+	cparams.paralyzemultiplier = 0.7 -- No real reason. T1.5 == EMP resist.
 end
 
 custom(unit("corroach")).techlevel = 1
@@ -185,14 +204,14 @@ custom(unit("corroach")).techlevel = 1
 for name, def in pairs(UnitDefs) do
 	if (custom(def).techlevel or 1) < 1.5 then
 		if def.extractsmetal and def.extractsmetal > 0 then
-			def.health = neat(unit(name).health * 2, 25)
+			set(unit(name), "health", 2, 0, 25)
 		elseif def.windgenerator and def.windgenerator > 0 then
-			def.health = neat(unit(name).health * 1.1, 25)
+			set(unit(name), "health", 1.1, 0, 25)
 		elseif cparams.solar and (def.energyupkeep and def.energyupkeep < -50) or (def.energymake and def.energymake > 50) then
-			def.health = neat(unit(name).health * 1.125, 25)
-			def.energystorage = neat((def.energystorage or 0) * 1.125)
+			set(unit(name), "health", 1.125, 0, 25)
+			set(unit(name), "energystorage", 1.125)
 		elseif next(def.buildoptions) and string.find(def.movementclass or "", "BOT") then
-			def.health = neat(unit(name).health * 1.12, 25)
+			set(unit(name), "health", 1.12, 0, 25)
 		end
 	end
 end
@@ -205,21 +224,20 @@ end
 
 unit("armpw")
 costs(1, 0, 0, 132)
-unitDef.speed = neat(unitDef.speed * 1.08)
+set(unitDef, "speed", 1.08)
 
 unit("armflash")
-unitDef.speed = neat(unitDef.speed * 1.08)
+set(unitDef, "speed", 1.08)
 
-unit("armkam")
-weapon("emg")
-weaponDef.sprayangle = neat(weaponDef.sprayangle * 0.6)
-weaponDef.weaponvelocity = neat(weaponDef.weaponvelocity * 1.1)
+unit("armkam"); weapon("emg");
+set(weaponDef, "sprayangle", 0.6)
+set(weaponDef, "weaponvelocity", 1.1)
 weaponDef.firetolerance = 3600
 
-unit("corlevlr")
-unitDef.speed = neat(unitDef.speed * 1.1)
-weapon("corlevlr_weapon")
-weaponDef.range = neat(weaponDef.range * 0.92)
+unit("corlevlr"); weapon("corlevlr_weapon");
+set(unitDef, "health", 1.1)
+set(unitDef, "speed", 1.1)
+set(weaponDef, "range", 0.92)
 
 -- This gives ground-to-ground capabilities to AA weapons (though pitifully weak).
 -- The true intent is to add a short-range point defense as a swapped weapon load.
@@ -228,10 +246,9 @@ weaponDef.range = neat(weaponDef.range * 0.92)
 -- With more ground AA, air, especially air scouts, can be balanced for survival.
 
 for name, wname in pairs { armrl = "armrl_missile", armcir = "arm_cir", corrl = "corrl_missile", corerad = "cor_erad", legrl = "legrl_missile", legrhapsis = "burst_aa_missile" } do
-	unit(name)
+	unit(name); weapon(wname);
 	unitDef.weapons[1].fastautoretargeting = true
 	unitDef.weapons[1].onlytargetcategory = "NOTSUB"
-	weapon(wname)
 	local salvo = (weaponDef.burst or 1) * (weaponDef.projectiles or 1)
 	weaponDef.damage.default = neat((20 + 0.2 * weaponDef.damage.vtol * salvo) / salvo)
 end
@@ -248,9 +265,9 @@ for _, name in ipairs { "armmoho", "cormoho", "cormexp", "legmoho", "legmoho", "
 end
 for name, def in pairs(UnitDefs) do
 	if custom(def).techlevel == 2 then
-		def.buildtime = neat(unit(name).buildtime * 1.5)
+		set(unit(name), "buildtime", 1.5)
 	elseif cparams.techlevel == 3 then
-		def.buildtime = neat(unit(name).buildtime * 2)
+		set(unit(name), "buildtime", 2)
 	end
 end
 for _, name in ipairs { "armageo", "corageo", "legageo" } do
@@ -262,36 +279,34 @@ for _, faction in ipairs { "arm", "cor", "leg" } do
 	for _, factory in ipairs { "lab", "vp", "ap", "sy" } do
 		if unit(faction .. factory) then
 			costs(0.5, 300, 900, 1000)
-			unitDef.workertime = neat(unitDef.workertime * 2.5, 50)
+			set(unitDef, "workertime", 2.5, 0, 50)
 		end
 	end
 	for _, factory in ipairs { "plat", "amsub", "amphlab" } do
 		if unit(faction .. factory) then
-			unitDef.workertime = neat(unitDef.workertime * 3 + 100, 50)
+			set(unitDef, "workertime", 3, 100)
 		end
 	end
 	for _, factory in ipairs { "alab", "avp", "aap", "asy" } do
 		if unit(faction .. factory) then
 			costs(1, -500, 2000, 2500)
-			unitDef.workertime = neat(unitDef.workertime * 5)
+			set(unitDef, "workertime", 5)
 		end
 	end
 	for _, factory in ipairs { "gant", "gantuw", "shltx", "shltxuw" } do
 		if unit(faction .. factory) then
 			costs(1.25)
-			unitDef.workertime = neat(unitDef.workertime * 7.5, 500)
+			set(unitDef, "workertime", 7.5, 0, 500)
 		end
 	end
 
-	-- NB: Construction turrets can't be too expensive or cons replace them.
 	for _, turret in ipairs { "nanotc", "nanotcplat" } do
 		if unit(faction .. turret) then
-			costs(1, 50, 500, 1000)
-			-- We need ways to justify the expense, then:
+			costs(1, 20)
 			unitDef.metalstorage = 25
 			unitDef.energystorage = 50
 			if faction == "cor" then
-				unitDef.health = neat(unitDef.health * 1.125, 25)
+				set(unitDef, "health", 1.125, 0, 25)
 			end
 		end
 	end
@@ -303,86 +318,80 @@ end
 -- T1.5 is not a reified game mechanic but a classification schema for units.
 -- They are more expensive, more powerful, and have better resistance to EMP.
 
-unit("armwar")
+unit("armwar"); weapon("armwar_laser");
 costs(1.2, 0, 0, 300)
-unitDef.health = neat(unitDef.health * 1.25, 25)
+set(unitDef, "health", 1.25, 0, 25)
+set(unitDef, "speed", 1.3333)
 unitDef.idleautoheal = 10
-unitDef.speed = neat(unitDef.speed * 1.3333)
-weapon("armwar_laser")
-weaponDef.range = neat(weaponDef.range - 30)
+set(weaponDef, "range", 0, -30)
 damages(1.25)
 
-unit("armjanus")
+unit("armjanus"); weapon("janus_rocket");
 costs(1.3333)
-unitDef.health = neat(unitDef.health * 1.1667, 25)
-unitDef.speed = neat(unitDef.speed * 1.125)
-weapon("janus_rocket")
-weaponDef.reloadtime = weaponDef.reloadtime * 0.925
+set(unitDef, "health", 1.1667, 0, 25)
+set(unitDef, "speed", 1.125)
+set(weaponDef, "reloadtime", 0.925)
 
 unit("armamex")
 costs(1.125)
-unitDef.health = neat(unitDef.health * 1.25, 25)
+set(unitDef, "health", 1.25, 0, 25)
 unitDef.explodeas = "mediumBuildingExplosionGeneric"
 unitDef.energymake = unitDef.cloakcost
 unitDef.radardistance = 1000
 unitDef.radaremitheight = 24
 unitDef.sightdistance = 200
 
-unit("corthud")
+unit("corthud"); weapon("arm_ham");
 costs(2)
-unitDef.health = neat(unitDef.health * 2, 25)
-unitDef.speed = neat(unitDef.speed * 1.1667)
-unitDef.turnrate = unitDef.turnrate * 1.05
-weapon("arm_ham")
-weaponDef.areaofeffect = neat(weaponDef.areaofeffect * 1.1667)
+set(unitDef, "health", 2)
+set(unitDef, "speed", 1.1667)
+set(unitDef, "turnrate", 1.05)
+set(weaponDef, "areaofeffect", 1.1667)
+set(weaponDef, "reloadtime", 1.5)
 weaponDef.burst = 2
 weaponDef.burstrate = 0.25
-weaponDef.reloadtime = weaponDef.reloadtime * 1.5
 
 unit("cormist")
 costs(2)
-unitDef.health = neat(unitDef.health * 1.3333, 25)
+set(unitDef, "health", 1.3333, 0, 25)
 for _, wname in ipairs { "cortruck_aa", "cortruck_missile" } do
 	weapon(wname)
+	set(weaponDef, "reloadtime", 2)
 	weaponDef.areaofeffect = UnitDefs.corstorm.weapondefs.cor_bot_rocket.areaofeffect + 2
 	weaponDef.burst = 3
 	weaponDef.burstrate = 0.375
-	weaponDef.reloadtime = weaponDef.reloadtime * 2
 end
 
-unit("corexp")
+unit("corexp"); weapon("hllt_bottom");
 costs(1.5)
-unitDef.health = neat(unitDef.health * 1.3333, 25)
+set(unitDef, "health", 1.3333, 0, 25)
 unitDef.idleautoheal = 10
-unitDef.sightdistance = neat(unitDef.sightdistance * 1.5)
-weaponDef = unitDef.weapondefs.hllt_bottom
-weaponDef.range = neat(weaponDef.range + 50)
+set(unitDef, "sightdistance", 1.5)
+set(weaponDef, "range", 0, 50)
 damages(1.125)
 
 --------------------------------------------------------------------------------
 -- Cortex bots -----------------------------------------------------------------
 
-unit("corak")
+unit("corak"); weapon("gator_laser");
 costs(0.8888)
-unitDef.health = neat(unitDef.health * 0.8888, 25)
-weaponDef = unitDef.weapondefs.gator_laser
-weaponDef.range = neat(weaponDef.range * 1.05)
+set(unitDef, "health", 0.8888, 0, 25)
+set(weaponDef, "range", 1.05)
 
 unit("corroach")
 costs(0.5, 0, -2000, -2000)
+set(unitDef, "speed", 1.3333)
 unitDef.maxwaterdepth = 16
 unitDef.movementclass = "BOT1"
 unitDef.radardistance = UnitDefs.armflea.sightdistance + 30
 unitDef.radaremitheight = 18
-unitDef.speed = neat(unitDef.speed * 1.3333)
 unitDef.explodeas = "mediumExplosionGenericSelfd"
 unitDef.selfdestructas = "fb_blastsml"
 unitDef.customparams.techlevel = nil
-for name, def in ipairs(UnitDefs) do
+for name, def in pairs(UnitDefs) do
 	if type(def.buildoptions) == "table" then
 		for i, bo in pairs(def.buildoptions) do
 			if bo == "corroach" then
-				unit(name)
 				table.remove(def.buildoptions, i)
 			end
 		end
@@ -400,8 +409,8 @@ unitDef.buildoptions[#unitDef.buildoptions + 1] = "corroach"
 -- HEMG
 ref = UnitDefs.armkam.weapondefs.emg
 for name, wname in pairs { armwar = "armwar_laser", armhlt = "arm_laserh1" } do
-	unit(name)
-	weapon(wname).name = "Heavy EMG"
+	unit(name); weapon(wname);
+	weaponDef.name = "Heavy EMG"
 	copy(weaponDef,
 		"weapontype",
 		"corethickness", "explosiongenerator", "intensity", "laserflaresize", "rgbcolor", "thickness", "size",
@@ -419,18 +428,18 @@ end
 -- Gauss
 ref = UnitDefs.armmav.weapondefs.armmav_weapon
 for name, wname in pairs { armham = "arm_ham" } do
-	unit(name)
+	unit(name); weapon(wname);
 	costs(1.1) -- Not a neutral conversion.
-	weapon(wname).name = "Gauss Plasma Cannon"
+	weaponDef.name = "Gauss Plasma Cannon"
 	copy(weaponDef, 'impulsefactor', 'weaponvelocity')
-	weaponDef.reloadtime = neat(weaponDef.reloadtime * 1.75, 0.01)
+	set(weaponDef, "reloadtime", 1.75, 0, 0.01)
 	damages(1.75)
 end
 
 -- LSFR
 for name, wname in pairs { cormist = "cortruck_missile", corstorm = "cor_bot_rocket" } do
-	unit(name)
-	weapon(wname).name = "Light Solid-Fuel Rocket"
+	unit(name); weapon(wname);
+	weaponDef.name = "Light Solid-Fuel Rocket"
 	weaponDef.model = "legsmallrocket.s3o"
 	weaponDef.burnblow = false
 	weaponDef.mygravity = 0
@@ -438,7 +447,7 @@ for name, wname in pairs { cormist = "cortruck_missile", corstorm = "cor_bot_roc
 	weaponDef.trajectoryheight = 0.25
 	weaponDef.turnrate = 8000
 	weaponDef.startvelocity = unitDef.speed + 1
-	weaponDef.weaponvelocity = neat(weaponDef.weaponvelocity * 2.2)
+	set(weaponDef, "weaponvelocity", 2.2)
 	weaponDef.weaponacceleration = weaponDef.weaponvelocity - weaponDef.startvelocity
 	local accelTime = (weaponDef.weaponvelocity - weaponDef.startvelocity) / weaponDef.weaponacceleration
 	local accelDistance = math.min(weaponDef.range,
